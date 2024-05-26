@@ -1,14 +1,13 @@
 #EEG ERP MMN analysis script 
-#1. waveform plotting. 
-  # requirements: pre-processed data is four columns 
+#1. waveform plotting - 
+  # requirements: pre-processed data is four columns: id; latency; condition; channel (or electrode);VH(y/n)
   # containing the MMN amplitude value for each time point (latency) for each pt 
-  # divided in groups
+  # divided in groups and for all conditions 
 
 
 rm(list = ls())
 
 library(ggplot2)
-library(reshape2)
 library(paletteer)
 
 erpdata <- read.csv(file.choose(), header = TRUE, sep=",")
@@ -17,8 +16,8 @@ head(erpdata)
 str(erpdata)
 
 erpdata$VH <- as.factor(erpdata$VH)
-erpdata$Condition <- as.factor(erpdata$Condition)
-erpdata$Channel <- as.factor(erpdata$Channel)
+erpdata$Condition <- as.factor(erpdata$Condition)  # standard, deviant, MMN
+erpdata$Channel <- as.factor(erpdata$Channel)  #which electrode 
 erpdata <- erpdata[erpdata$Condition == 'MMN',]
 
 
@@ -35,83 +34,43 @@ erp.plot+
   stat_summary(fun.y = mean,geom = "line",size = 1,aes(colour = Condition))+
   labs(x = "Time (ms)",y = expression(paste("Amplitude (",mu,"V)")),colour = "")+
   paletteer::scale_color_paletteer_d("wesanderson::GrandBudapest2")+
-  geom_vline(xintercept = 0,linetype = "dashed" )+
-  geom_hline(yintercept = 0,linetype = "dashed") + 
-  scale_x_continuous(limits = c(-50,300)) +
+  scale_x_continuous(limits = c(-50,400)) +
   facet_wrap(~VH)
 
 
-
-#distribtion plot - load vmmn_plot_distr.csv dataset
-erpdata <- read.csv(file.choose(), header = TRUE, sep=",")
-View(erpdata)
-head(erpdata)
-str(erpdata)
-
-library(ggplot2)
-library(ggridges)
-theme_set(theme_minimal())
-
-# Opened polygons
-p <- ggplot(erpdata, aes(x = MMN, y = Channel, group = Channel)) + 
-  geom_density_ridges(fill = "#00AFBB") +
-  facet_wrap(~VH)
-p
-
-
-
-
-ggplot(
-  erpdata, 
-  aes(x = MMN, y = Channel, fill = after_stat(x))
-) +
-  geom_density_ridges_gradient(scale = 3, size = 0.3, rel_min_height = 0.01) +
-  scale_fill_viridis_c(name = "MMN amplitude", option = "H") +
-  labs(title = 'MMN distribution across groups') + 
-  scale_x_continuous(limits = c(-3.0,3.0))+
-  facet_wrap(~VH)
-
-
-
-
-
-#to add variability, add shaded areas representing 95% confidence intervals. 
-#These confidence intervals are bootstrapped
-#helpful for between-subjects data, as  the CI would help me make inferences 
-#from looking at the distance between the lines and shaded regions and spot 
-#differences in variability across conditions, if more conditions are added (e.g
-#if we want to plot standard and deviant(s), rather then the MMN already)
+#with CI
 
 erp.plot+
-  stat_summary(fun.data = mean_cl_boot,geom = "ribbon",size = 1,aes(fill = Condition),alpha = 0.3)+
+  stat_summary(fun.data = mean_cl_boot,geom = "ribbon", aes(fill = Condition),alpha = 0.3)+
   guides(fill = "none")+
-  stat_summary(fun.y = mean,geom = "line",size = 1,aes(colour = Condition))+
-  labs(x = "Time (ms)",y = expression(paste("Amplitude (",mu,"V)")),colour = "")+
+  stat_summary(fun.y = mean,geom = "line", aes(colour = Condition))+
   paletteer::scale_color_paletteer_d("wesanderson::Moonrise3")+
-  geom_vline(xintercept = 0,linetype = "dashed" )+
-  geom_hline(yintercept = 0,linetype = "dashed") + 
-  scale_x_continuous(limits = c(-50,300))  +
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0) + 
+  scale_x_continuous(limits = c(-50,400))  +
   facet_wrap(~VH)
 
 
-#.2 analyse difference in the 90-150 ms interval
+#.2 analyse difference in a specific interval
+#data is organised in: id;VH(y/n); mean amplitude for electrodes of interest
+#for each participant for a specific interval 
+
 library(ggpubr)
 library(tidyverse)
 library(broom)
-library(AICcmodavg)
 
 
-erpdta <- read.csv(file.choose(), header = TRUE, sep=",")
-View(erpdta)
-head(erpdta)
-str(erpdta)
+mmndata <- read.csv(file.choose(), header = TRUE, sep=",")
+View(mmndata)
+head(mmndata)
+str(mmndata)
 
-erpdta$VH <- as.factor(erpdta$VH)
+mmndata$VH <- as.factor(mmndata$VH)
 
 #FZ
-summary(erpdta)
+summary(mmndata)
 
-anova <- aov(P4 ~ VH, data = erpdta)
+anova <- aov(P4 ~ VH, data = mmndata)
 summary(anova)
 
 
@@ -119,17 +78,16 @@ summary(anova)
 tukey.two.way<-TukeyHSD(anovaFZ)
 tukey.two.way
 
-
-erp.plot <- ggplot(erpdata,aes(latency,dFZ))+
+#plotting the deviant for example
+erp.plot <- ggplot(mmndata,aes(latency,dFZ))+
   paletteer::scale_color_paletteer_d("wesanderson::Moonrise3")+
   theme_classic()
 
 erp.plot+
-  stat_summary(fun.y = mean,geom = "line",size = 1,aes(colour = VH))+
-  labs(x = "Time (ms)",y = expression(paste("Amplitude (",mu,"V)")),colour = "")+
+  stat_summary(fun.y = mean,geom = "line",size = 2, aes(colour = VH))+
   geom_vline(xintercept = 0,linetype = "dashed" )+
   geom_hline(yintercept = 0,linetype = "dashed")+ 
-  scale_x_continuous(limits = c(-50,200)) 
+  scale_x_continuous(limits = c(-50,300)) 
 
 #homesched test
 par(mfrow=c(2,2))
@@ -139,8 +97,8 @@ par(mfrow=c(1,1))
 
 
 #POZ
-anovaP0Z <- aov(MMN_amplitudePOZ ~ VH, data = erpata)
-summary(anovaFZ)
+anovaP0Z <- aov(MMN_amplitudePOZ ~ VH, data = mmndata)
+summary(anovaPOZ)
 
 
 #posthoc
@@ -152,12 +110,7 @@ erp.plot <- ggplot(erpdata,aes(latency,dPOZ))+
   paletteer::scale_color_paletteer_d("wesanderson::Moonrise3")+
   theme_classic()
 
-erp.plot+
-  stat_summary(fun.y = mean,geom = "line",size = 1,aes(colour = VH))+
-  labs(x = "Time (ms)",y = expression(paste("Amplitude (",mu,"V)")),colour = "")+
-  geom_vline(xintercept = 0,linetype = "dashed" )+
-  geom_hline(yintercept = 0,linetype = "dashed")+ 
-  scale_x_continuous(limits = c(-50,200)) 
+
 
 #homesched test
 par(mfrow=c(2,2))
